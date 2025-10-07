@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Debug UniCloud Backend",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005,
+      "projectName": "unicloud-backend"
+    },
+    {
+      "type": "java",
+      "name": "Debug UniCloud Backend (Launch)",
+      "request": "launch",
+      "mainClass": "com.unicloud.backend.UniCloudBackendApplication",
+      "projectName": "unicloud-backend",
+      "args": "",
+      "vmArgs": "-Dspring.profiles.active=dev"
+    },
+    {
+      "type": "java",
+      "name": "Run Tests with Debugging",
+      "request": "launch",
+      "mainClass": "",
+      "projectName": "unicloud-backend",
+      "classPaths": [
+        "$Auto"
+      ],
+      "modulePaths": [
+        "$Auto"
+      ]
+    }
+  ]
+}

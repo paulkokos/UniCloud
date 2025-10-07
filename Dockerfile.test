@@ -1,0 +1,66 @@
+# Testing Dockerfile with test utilities
+FROM maven:3.9-openjdk-17-slim AS test
+
+# Install testing tools
+RUN apt-get update && \
+    apt-get install -y \
+    curl \
+    netcat-openbsd \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy Maven configuration
+COPY pom.xml .
+
+# Download dependencies
+RUN mvn dependency:go-offline -B
+
+# Copy source and test code
+COPY src ./src
+
+# Build stage for testing
+FROM test AS test-runner
+
+# Build application with tests
+RUN mvn clean compile test-compile
+
+# Create test user
+RUN groupadd -r testuser && \
+    useradd -r -g testuser -s /bin/bash testuser
+
+# Create test directories
+RUN mkdir -p /app/target/test-reports /app/logs && \
+    chown -R testuser:testuser /app
+
+# Switch to test user
+USER testuser
+
+# Expose application port for integration tests
+EXPOSE 8080
+
+# Set test JVM options
+ENV JAVA_OPTS="-Xms256m -Xmx512m -Dspring.profiles.active=test"
+
+# Default command runs tests
+CMD ["mvn", "test", "-Dspring.profiles.active=test"]
+
+# Integration test stage
+FROM test AS integration-test
+
+# Package the application for integration tests
+RUN mvn package -DskipTests
+
+# Create integration test user
+RUN groupadd -r integrationuser && \
+    useradd -r -g integrationuser -s /bin/bash integrationuser
+
+RUN mkdir -p /app/target/integration-reports /app/logs && \
+    chown -R integrationuser:integrationuser /app
+
+USER integrationuser
+
+# Entry point for integration tests
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar target/*.jar & sleep 30 && mvn failsafe:integration-test failsafe:verify"]

@@ -1,0 +1,255 @@
+# application.yml - PostgreSQL 17 Configuration for UniCloud
+
+spring:
+ application:
+   name: unicloud-backend
+
+ # PostgreSQL 17 Database Configuration
+ datasource:
+   url: jdbc:postgresql://localhost:5432/uniclouddb
+   username: ${POSTGRES_USERNAME:unicloud_dev}
+   password: ${POSTGRES_PASSWORD:dev_password}
+   driver-class-name: org.postgresql.Driver
+   
+   # HikariCP Connection Pool Settings (optimized for PostgreSQL 17)
+   hikari:
+     connection-timeout: 20000
+     maximum-pool-size: 20
+     minimum-idle: 5
+     idle-timeout: 300000
+     max-lifetime: 1200000
+     leak-detection-threshold: 60000
+     pool-name: UniCloudHikariCP
+     # PostgreSQL 17 specific connection properties
+     data-source-properties:
+       cachePrepStmts: true
+       prepStmtCacheSize: 250
+       prepStmtCacheSqlLimit: 2048
+       useServerPrepStmts: true
+       useLocalSessionState: true
+       rewriteBatchedStatements: true
+       cacheResultSetMetadata: true
+       cacheServerConfiguration: true
+       elideSetAutoCommits: true
+       maintainTimeStats: false
+
+ # JPA Configuration for PostgreSQL 17
+ jpa:
+   database: POSTGRESQL
+   database-platform: org.hibernate.dialect.PostgreSQLDialect
+   hibernate:
+     ddl-auto: validate
+     naming:
+       physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+       implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+   properties:
+     hibernate:
+       # PostgreSQL 17 optimizations
+       dialect: org.hibernate.dialect.PostgreSQLDialect
+       jdbc:
+         batch_size: 25
+         fetch_size: 50
+         lob.non_contextual_creation: true
+       order_inserts: true
+       order_updates: true
+       batch_versioned_data: true
+       # Enable PostgreSQL 17 JSON features
+       type.preferred_json_mapper: jsonb
+       # Connection and performance settings
+       connection.provider_disables_autocommit: true
+       cache.use_second_level_cache: false
+       cache.use_query_cache: false
+       generate_statistics: false
+       show_sql: false
+       format_sql: false
+       # PostgreSQL 17 specific features
+       temp.use_jdbc_metadata_defaults: false
+
+ # Flyway Configuration for PostgreSQL 17
+ flyway:
+   enabled: true
+   baseline-on-migrate: true
+   baseline-version: 1.0.0
+   locations: classpath:db/migration
+   sql-migration-prefix: V
+   sql-migration-suffix: .sql
+   placeholder-replacement: false
+   validate-on-migrate: true
+   clean-disabled: true
+
+
+
+ # OAuth2 Configuration
+ security:
+   # Security Configuration
+
+   jwt:
+     secret: ${JWT_SECRET:mySecretKey}
+     expiration: 86400000 # 24 hours
+     refresh-expiration: 604800000 # 7 days
+   oauth2:
+     client:
+       registration:
+         google:
+           client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
+           client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+           scope: 
+             - openid
+             - profile
+             - email
+             - https://www.googleapis.com/auth/drive.file
+         microsoft:
+           client-id: ${MICROSOFT_CLIENT_ID:your-microsoft-client-id}
+           client-secret: ${MICROSOFT_CLIENT_SECRET:your-microsoft-client-secret}
+           scope:
+             - openid
+             - profile
+             - email
+             - files.readwrite
+             - offline_access
+
+# Application-specific Configuration
+unicloud:
+ cors:
+   allowed-origins: 
+     - "http://localhost:3000"
+     - "http://localhost:8080"
+   allowed-methods: 
+     - GET
+     - POST
+     - PUT
+     - DELETE
+     - PATCH
+     - OPTIONS
+   allowed-headers: "*"
+   allow-credentials: true
+ 
+ file:
+   max-size: 100MB
+   upload-dir: ${UPLOAD_DIR:./uploads}
+   temp-dir: ${TEMP_DIR:./temp}
+ 
+ cloud:
+   storage:
+     timeout: 30000
+     retry-attempts: 3
+     retry-delay: 1000
+
+# Logging Configuration
+logging:
+ level:
+   com.unicloud: DEBUG
+   org.springframework.security: DEBUG
+   org.hibernate.SQL: WARN
+   org.hibernate.type.descriptor.sql.BasicBinder: WARN
+   org.postgresql: INFO
+ pattern:
+   console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+   file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+ file:
+   name: logs/unicloud.log
+
+# Management and Monitoring
+management:
+ endpoints:
+   web:
+     exposure:
+       include: health,info,metrics,prometheus
+ endpoint:
+   health:
+     show-details: always
+     show-components: always
+ metrics:
+   export:
+     prometheus:
+       enabled: true
+
+# Server Configuration
+server:
+ port: 8080
+ servlet:
+   context-path: /api
+ compression:
+   enabled: true
+   mime-types: text/html,text/css,application/javascript,application/json
+ http2:
+   enabled: true
+
+---
+# Development Profile
+spring:
+ config:
+   activate:
+     on-profile: dev
+ 
+ datasource:
+   url: jdbc:postgresql://localhost:5432/uniclouddb
+   username: unicloud_dev
+   password: dev_password
+ 
+ jpa:
+   hibernate:
+     ddl-auto: update
+   properties:
+     hibernate:
+       show_sql: true
+       format_sql: true
+
+logging:
+ level:
+   com.unicloud: DEBUG
+   org.springframework.web: DEBUG
+   org.hibernate.SQL: DEBUG
+
+---
+# Test Profile
+spring:
+ config:
+   activate:
+     on-profile: test
+ 
+ datasource:
+   url: jdbc:postgresql://localhost:5432/uniclouddb_test
+   username: unicloud_test
+   password: test_password
+ 
+ jpa:
+   hibernate:
+     ddl-auto: create-drop
+   properties:
+     hibernate:
+       show_sql: false
+       format_sql: false
+
+ flyway:
+   enabled: false
+
+---
+# Production Profile  
+spring:
+ config:
+   activate:
+     on-profile: prod
+ 
+ datasource:
+   url: ${DATABASE_URL}
+   username: ${POSTGRES_USERNAME}
+   password: ${POSTGRES_PASSWORD}
+   hikari:
+     maximum-pool-size: 50
+     minimum-idle: 10
+     connection-timeout: 30000
+ 
+ jpa:
+   hibernate:
+     ddl-auto: validate
+   properties:
+     hibernate:
+       show_sql: false
+       format_sql: false
+       generate_statistics: false
+
+logging:
+ level:
+   com.unicloud: INFO
+   root: WARN

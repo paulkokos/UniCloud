@@ -1,0 +1,11 @@
+FROM eclipse-temurin:17-jre
+
+WORKDIR /app
+COPY target/*.jar app.jar
+RUN mkdir -p /app/logs
+
+EXPOSE 8080 5005
+
+ENV JAVA_OPTS="-Xms256m -Xmx512m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dspring.profiles.active=development"
+
+CMD ["java", "-Dspring.main.class=com.unicloud.UniCloudBackendApplication", "-jar", "app.jar"]

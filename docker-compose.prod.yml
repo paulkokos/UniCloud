@@ -1,0 +1,176 @@
+version: '3.8'
+
+services:
+  # Production Database with optimizations
+  postgres:
+    environment:
+      POSTGRES_DB: unicloud_prod
+      POSTGRES_USER: ${PROD_DB_USER}
+      POSTGRES_PASSWORD: ${PROD_DB_PASSWORD}
+    volumes:
+      - prod_postgres_data:/var/lib/postgresql/data
+      - ./sql/prod-init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+    ports: []  # Don't expose database port in production
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PROD_DB_USER} -d unicloud_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Production Redis with persistence
+  redis:
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${PROD_REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - prod_redis_data:/data
+    ports: []  # Don't expose Redis port in production
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Production Backend with optimizations
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      # Production Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/unicloud_prod
+      SPRING_DATASOURCE_USERNAME: ${PROD_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${PROD_DB_PASSWORD}
+      SPRING_PROFILES_ACTIVE: production
+
+      # Production Redis
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PASSWORD: ${PROD_REDIS_PASSWORD}
+
+      # Production JPA settings
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: false
+
+      # Production logging
+      LOGGING_LEVEL_ROOT: INFO
+      LOGGING_LEVEL_COM_UNICLOUD: INFO
+      LOGGING_PATTERN_FILE: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+      # Production OAuth credentials (from environment)
+      GOOGLE_CLIENT_ID: ${PROD_GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${PROD_GOOGLE_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${PROD_MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${PROD_MICROSOFT_CLIENT_SECRET}
+      ICLOUD_CLIENT_ID: ${PROD_ICLOUD_CLIENT_ID}
+      ICLOUD_CLIENT_SECRET: ${PROD_ICLOUD_CLIENT_SECRET}
+
+      # Production JWT settings
+      JWT_SECRET: ${PROD_JWT_SECRET}
+      JWT_EXPIRATION: 86400  # 24 hours
+
+      # Performance tuning
+      JAVA_OPTS: >
+        -Xms512m -Xmx1g
+        -XX:+UseG1GC
+        -XX:MaxGCPauseMillis=200
+        -XX:+UseStringDeduplication
+        -Djava.security.egd=file:/dev/./urandom
+
+      # Monitoring and metrics
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: when_authorized
+    ports:
+      - "8080:8080"
+    volumes:
+      - prod_logs:/app/logs:rw
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Nginx reverse proxy with SSL
+  nginx:
+    image: nginx:alpine
+    container_name: unicloud-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - prod_nginx_logs:/var/log/nginx
+    depends_on:
+      - backend
+    networks:
+      - unicloud-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+
+  # Log aggregation (optional)
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.5.0
+    container_name: unicloud-filebeat
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - prod_logs:/var/log/app:ro
+      - prod_nginx_logs:/var/log/nginx:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - unicloud-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+volumes:
+  prod_postgres_data:
+    name: unicloud-prod-postgres-data
+  prod_redis_data:
+    name: unicloud-prod-redis-data
+  prod_logs:
+    name: unicloud-prod-logs
+  prod_nginx_logs:
+    name: unicloud-prod-nginx-logs

@@ -1,0 +1,184 @@
+version: '3.8'
+
+services:
+  # Test Database with test data
+  postgres:
+    environment:
+      POSTGRES_DB: unicloud_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    volumes:
+      - ./sql/test-data.sql:/docker-entrypoint-initdb.d/test-data.sql
+      - ./sql/test-fixtures.sql:/docker-entrypoint-initdb.d/test-fixtures.sql
+    ports:
+      - "5434:5432"  # Different port for testing
+    tmpfs:
+      - /var/lib/postgresql/data  # Use tmpfs for faster test database
+
+  # Test Redis (in-memory only)
+  redis:
+    command: redis-server --save ""  # Disable persistence for tests
+    tmpfs:
+      - /data
+
+  # Backend with test profile
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: test
+    environment:
+      # Test Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/unicloud_test
+      SPRING_DATASOURCE_USERNAME: test_user
+      SPRING_DATASOURCE_PASSWORD: test_password
+      SPRING_PROFILES_ACTIVE: test
+
+      # Test Redis
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PASSWORD: ""
+
+      # Test JPA settings
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      SPRING_JPA_SHOW_SQL: true
+
+      # Test logging
+      LOGGING_LEVEL_COM_UNICLOUD: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB: DEBUG
+      LOGGING_LEVEL_SQL: DEBUG
+
+      # Mock OAuth for testing
+      OAUTH_MOCK_ENABLED: true
+      GOOGLE_CLIENT_ID: test-google-client
+      GOOGLE_CLIENT_SECRET: test-google-secret
+      MICROSOFT_CLIENT_ID: test-microsoft-client
+      MICROSOFT_CLIENT_SECRET: test-microsoft-secret
+      ICLOUD_CLIENT_ID: test-icloud-client
+      ICLOUD_CLIENT_SECRET: test-icloud-secret
+
+      # Test JWT settings
+      JWT_SECRET: test-jwt-secret-key
+      JWT_EXPIRATION: 300  # 5 minutes for testing
+
+      # Test file upload settings
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 10MB
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 10MB
+
+      # Disable security for some tests
+      SECURITY_REQUIRE_SSL: false
+    ports:
+      - "8083:8080"
+    volumes:
+      - test_logs:/app/logs
+    command: >
+      java -Dspring.profiles.active=test
+      -Djunit.jupiter.execution.parallel.enabled=true
+      -jar app.jar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Mock OAuth Provider for testing
+  mock-oauth:
+    image: node:18-alpine
+    container_name: unicloud-mock-oauth
+    working_dir: /app
+    volumes:
+      - ./test/mock-oauth:/app
+    ports:
+      - "8084:3000"
+    networks:
+      - unicloud-network
+    command: >
+      sh -c "npm install && npm start"
+    environment:
+      NODE_ENV: test
+      PORT: 3000
+      GOOGLE_MOCK_ENABLED: true
+      MICROSOFT_MOCK_ENABLED: true
+      ICLOUD_MOCK_ENABLED: true
+
+  # Test Data Generator
+  test-data-generator:
+    build:
+      context: ./test/data-generator
+      dockerfile: Dockerfile
+    container_name: unicloud-test-data
+    depends_on:
+      - postgres
+      - backend
+    networks:
+      - unicloud-network
+    environment:
+      DATABASE_URL: postgresql://test_user:test_password@postgres:5432/unicloud_test
+      BACKEND_URL: http://backend:8080
+      GENERATE_USERS: 100
+      GENERATE_FILES: 1000
+    volumes:
+      - test_files:/test-files
+    profiles:
+      - data-generation
+
+  # Integration Test Runner
+  integration-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: test-runner
+    container_name: unicloud-integration-tests
+    depends_on:
+      backend:
+        condition: service_healthy
+      mock-oauth:
+        condition: service_started
+    networks:
+      - unicloud-network
+    environment:
+      TEST_BASE_URL: http://backend:8080
+      MOCK_OAUTH_URL: http://mock-oauth:3000
+      TEST_DATABASE_URL: postgresql://test_user:test_password@postgres:5432/unicloud_test
+      PARALLEL_TESTS: true
+      TEST_TIMEOUT: 30000
+    volumes:
+      - ./src/test:/app/src/test:ro
+      - ./test/integration:/app/test/integration:ro
+      - test_reports:/app/target/test-reports
+    command: >
+      mvn test -Dtest.profile=integration
+      -Dspring.profiles.active=test
+      -Dmaven.test.failure.ignore=true
+    profiles:
+      - integration-tests
+
+  # Performance Test Runner
+  performance-tests:
+    image: loadimpact/k6:latest
+    container_name: unicloud-performance-tests
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - unicloud-network
+    volumes:
+      - ./test/performance:/scripts
+      - test_reports:/reports
+    environment:
+      TARGET_URL: http://backend:8080
+      VIRTUAL_USERS: 50
+      TEST_DURATION: 2m
+    command: >
+      k6 run --out json=/reports/performance-results.json
+      /scripts/load-test.js
+    profiles:
+      - performance-tests
+
+volumes:
+  test_logs:
+    name: unicloud-test-logs
+  test_files:
+    name: unicloud-test-files
+  test_reports:
+    name: unicloud-test-reports

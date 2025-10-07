@@ -1,0 +1,87 @@
+services:
+  # Development Database with additional configurations
+  postgres:
+    environment:
+      POSTGRES_DB: unicloud_dev
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - ./sql/dev-data.sql:/docker-entrypoint-initdb.d/dev-data.sql
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+
+  # Development Redis
+  redis:
+    command: redis-server --appendonly yes
+    # No password in development for easier debugging
+
+  # Backend with development settings
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      # Remove target: development line
+    environment:
+      # Override base environment variables
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/unicloud_dev
+      SPRING_DATASOURCE_USERNAME: dev_user
+      SPRING_DATASOURCE_PASSWORD: dev_password
+      SPRING_PROFILES_ACTIVE: development
+
+      # Development Redis (no password)
+      SPRING_REDIS_PASSWORD: ""
+
+      # Development logging
+      LOGGING_LEVEL_COM_UNICLOUD: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
+      LOGGING_LEVEL_SQL: DEBUG
+
+      # Hot reload and development features
+      SPRING_DEVTOOLS_RESTART_ENABLED: true
+      SPRING_JPA_SHOW_SQL: true
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+      # Mock OAuth credentials for development
+      GOOGLE_CLIENT_ID: mock-google-client-id
+      GOOGLE_CLIENT_SECRET: mock-google-client-secret
+      MICROSOFT_CLIENT_ID: mock-microsoft-client-id
+      MICROSOFT_CLIENT_SECRET: mock-microsoft-client-secret
+      ICLOUD_CLIENT_ID: mock-icloud-client-id
+      ICLOUD_CLIENT_SECRET: mock-icloud-client-secret
+
+      # Development JWT settings
+      JWT_SECRET: dev-secret-key-for-testing-only
+      JWT_EXPIRATION: 3600  # 1 hour for easier development
+    ports:
+      - "8080:8080"
+      - "5005:5005"  # Debug port
+    volumes:
+      - dev_logs:/app/logs
+
+  # Development tools and utilities
+  adminer:
+    image: adminer:4.8.1
+    container_name: unicloud-adminer
+    ports:
+      - "8081:8080"
+    networks:
+      - unicloud-network
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: unicloud-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8082:8081"
+    networks:
+      - unicloud-network
+    depends_on:
+      - redis
+
+volumes:
+  dev_logs:
+    name: unicloud-dev-logs

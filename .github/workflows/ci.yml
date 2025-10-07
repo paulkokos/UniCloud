@@ -1,0 +1,349 @@
+name: UniCloud CI Pipeline
+
+# Πότε τρέχει το workflow
+on:
+  push:
+    branches: [ master, develop, feature/** ]
+  pull_request:
+    branches: [ master, develop ]
+
+# Permissions for GitHub Actions
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+# Περιβάλλον variables για όλα τα jobs
+env:
+  JAVA_VERSION: '17'
+  MAVEN_OPTS: -Xmx3072m
+
+jobs:
+  # ============================================
+  # JOB 1: Build & Compile Check
+  # ============================================
+  build:
+    name: Build & Compile
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache Maven Dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    - name: Build All Modules
+      run: mvn clean install -DskipTests
+      env:
+        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: |
+          **/target/*.jar
+          !**/target/*-javadoc.jar
+          !**/target/*-sources.jar
+        retention-days: 7
+
+  # ============================================
+  # JOB 2: Unit Tests
+  # ============================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Run Unit Tests
+      run: mvn test -DexcludedGroups=integration
+
+    - name: Publish Unit Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          **/target/surefire-reports/*.xml
+        check_name: Unit Test Results
+
+    - name: Upload Test Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: unit-test-reports
+        path: |
+          **/target/surefire-reports/
+        retention-days: 30
+
+  # ============================================
+  # JOB 3: Integration Tests (με Docker)
+  # ============================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+
+    # Services που τρέχουν παράλληλα με το test
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: unicloud_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Wait for Services
+      run: |
+        echo "Waiting for PostgreSQL..."
+        timeout 30 bash -c 'until pg_isready -h localhost -p 5432; do sleep 1; done'
+        echo "PostgreSQL is ready!"
+
+    - name: Run Integration Tests
+      run: mvn verify -Dgroups=integration
+      env:
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/unicloud_test
+        SPRING_DATASOURCE_USERNAME: test_user
+        SPRING_DATASOURCE_PASSWORD: test_password
+        SPRING_REDIS_HOST: localhost
+        SPRING_REDIS_PORT: 6379
+
+    - name: Publish Integration Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      continue-on-error: true
+      with:
+        files: |
+          **/target/failsafe-reports/TEST-*.xml
+        check_name: Integration Test Results
+
+    - name: Upload Test Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-reports
+        path: |
+          **/target/failsafe-reports/
+        retention-days: 30
+
+  # ============================================
+  # JOB 4: Code Coverage
+  # ============================================
+  code-coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Run Tests with Coverage
+      run: mvn clean verify jacoco:report
+
+    - name: Generate Coverage Report
+      run: mvn jacoco:report-aggregate
+
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./target/site/jacoco-aggregate/jacoco.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Comment Coverage on PR
+      uses: madrapps/jacoco-report@v1.6.1
+      if: github.event_name == 'pull_request'
+      with:
+        paths: |
+          ${{ github.workspace }}/**/target/site/jacoco/jacoco.xml
+        token: ${{ secrets.GITHUB_TOKEN }}
+        min-coverage-overall: 40
+        min-coverage-changed-files: 60
+        title: Code Coverage Report
+
+    - name: Upload Coverage Reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports
+        path: |
+          **/target/site/jacoco/
+        retention-days: 30
+
+  # ============================================
+  # JOB 5: Code Quality & Security Scan
+  # ============================================
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Για SonarCloud
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Checkstyle Analysis
+      run: mvn checkstyle:check
+      continue-on-error: true
+
+    - name: SpotBugs Analysis
+      run: mvn compile spotbugs:check
+      continue-on-error: true
+
+    - name: OWASP Dependency Check
+      run: mvn dependency-check:check
+      continue-on-error: true
+      env:
+        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      continue-on-error: true
+      with:
+        name: security-reports
+        path: |
+          **/target/dependency-check-report.html
+          **/target/spotbugsXml.xml
+        retention-days: 30
+
+  # ============================================
+  # JOB 6: Docker Build Test
+  # ============================================
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build JARs for Docker
+      run: mvn clean package -DskipTests
+      env:
+        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker Images
+      run: |
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+
+    - name: Test Docker Compose Stack
+      run: |
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+        sleep 15
+        curl -f http://localhost:8080/actuator/health || exit 1
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+
+    - name: Check Image Sizes
+      run: docker images | grep unicloud
+
+  # ============================================
+  # JOB 7: Build Summary
+  # ============================================
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build, unit-tests, integration-tests, code-coverage, code-quality, docker-build]
+    if: always()
+
+    steps:
+    - name: Check Build Status
+      run: |
+        echo "=========================================="
+        echo "UniCloud CI Pipeline Summary"
+        echo "=========================================="
+        echo "Build: ${{ needs.build.result }}"
+        echo "Unit Tests: ${{ needs.unit-tests.result }}"
+        echo "Integration Tests: ${{ needs.integration-tests.result }}"
+        echo "Code Coverage: ${{ needs.code-coverage.result }}"
+        echo "Code Quality: ${{ needs.code-quality.result }}"
+        echo "Docker Build: ${{ needs.docker-build.result }}"
+        echo "=========================================="
+
+        if [ "${{ needs.build.result }}" != "success" ] || \
+           [ "${{ needs.unit-tests.result }}" != "success" ] || \
+           [ "${{ needs.integration-tests.result }}" != "success" ]; then
+          echo "CI Pipeline FAILED"
+          exit 1
+        else
+          echo "CI Pipeline PASSED"
+        fi

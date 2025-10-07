@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: unicloud-postgres
+    environment:
+      POSTGRES_DB: unicloud
+      POSTGRES_USER: unicloud_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-defaultpassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - unicloud-network
+    restart: unless-stopped
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: unicloud-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-defaultredis}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - unicloud-network
+    restart: unless-stopped
+
+  # UniCloud Backend Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: unicloud-backend
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/unicloud
+      SPRING_DATASOURCE_USERNAME: unicloud_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-defaultpassword}
+
+      # Redis Configuration
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-defaultredis}
+
+      # Application Configuration
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-default}
+      SERVER_PORT: 8080
+
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET:-your-256-bit-secret}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
+
+      # OAuth Configuration (will be overridden in environment-specific files)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      ICLOUD_CLIENT_ID: ${ICLOUD_CLIENT_ID:-}
+      ICLOUD_CLIENT_SECRET: ${ICLOUD_CLIENT_SECRET:-}
+    ports:
+      - "8080:8080"
+    networks:
+      - unicloud-network
+    volumes:
+      - app_logs:/app/logs
+    restart: unless-stopped
+
+# Networks
+networks:
+  unicloud-network:
+    driver: bridge
+    name: unicloud-network
+
+# Volumes
+volumes:
+  postgres_data:
+    name: unicloud-postgres-data
+  redis_data:
+    name: unicloud-redis-data
+  app_logs:
+    name: unicloud-app-logs

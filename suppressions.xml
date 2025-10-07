@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN" "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+  <!-- Suppress checks for generated files -->
+  <suppress files="[\\/]target[\\/]" checks=".*" />
+  <suppress files="[\\/]build[\\/]" checks=".*" />
+
+  <!-- Suppress checks for test files where strict rules aren't needed -->
+  <suppress files="[\\/]test[\\/].*Test\.java$" checks="MagicNumber" />
+  <suppress files="[\\/]test[\\/].*Test\.java$" checks="JavadocMethod" />
+  <suppress files="[\\/]test[\\/].*Test\.java$" checks="JavadocType" />
+
+  <!-- Suppress for configuration classes -->
+  <suppress files=".*Config\.java$" checks="JavadocMethod" />
+  <suppress files=".*Configuration\.java$" checks="JavadocMethod" />
+
+  <!-- Suppress for Application main classes -->
+  <suppress files=".*Application\.java$" checks="HideUtilityClassConstructor" />
+
+  <!-- Suppress for DTOs and entities where public fields might be used -->
+  <suppress files=".*DTO\.java$" checks="VisibilityModifier" />
+  <suppress files=".*Entity\.java$" checks="VisibilityModifier" />
+
+  <!-- Suppress for mock/test data -->
+  <suppress files="[\\/]mock[\\/]" checks=".*" />
+  <suppress files="MockOAuth" checks=".*" />
+
+</suppressions>
