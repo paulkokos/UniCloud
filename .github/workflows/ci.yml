@@ -310,7 +310,7 @@ jobs:
       run: |
         docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
         sleep 15
-        curl -f http://localhost:8080/actuator/health || exit 1
+        curl -f http://localhost:8080/api/actuator/health || exit 1
         docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
     - name: Check Image Sizes
