@@ -6,10 +6,16 @@ WORKDIR /app
 
 # Copy Maven configuration files first (for better caching)
 COPY pom.xml .
-COPY src ./src
+COPY unicloud-common/pom.xml unicloud-common/
+COPY unicloud-backend/pom.xml unicloud-backend/
+COPY unicloud-desktop/pom.xml unicloud-desktop/
+
+# Copy source code
+COPY unicloud-common/src unicloud-common/src
+COPY unicloud-backend/src unicloud-backend/src
 
 # Build the application
-RUN mvn clean package -DskipTests -Dmaven.javadoc.skip=true
+RUN mvn clean package -DskipTests -Dmaven.javadoc.skip=true -pl unicloud-backend -am
 
 # Production stage
 FROM eclipse-temurin:17-jre-alpine AS production
@@ -25,7 +31,7 @@ RUN addgroup -g 1001 -S unicloudapp && \
 WORKDIR /app
 
 # Copy the built JAR from build stage
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/unicloud-backend/target/*.jar app.jar
 
 # Create logs directory and set permissions
 RUN mkdir -p /app/logs /app/temp && \
