@@ -23,7 +23,7 @@ COPY unicloud-backend/src unicloud-backend/src
 RUN mvn clean package -DskipTests -Dmaven.javadoc.skip=true -pl unicloud-backend -am
 
 # Production stage
-FROM eclipse-temurin:17-jre-alpine AS production
+FROM eclipse-temurin:25-jre-alpine AS production
 
 # Install curl for health checks and ca-certificates for SSL
 RUN apk add --no-cache curl ca-certificates
