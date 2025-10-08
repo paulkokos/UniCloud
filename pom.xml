@@ -33,7 +33,7 @@
 
         <!-- Code Quality -->
         <checkstyle.version>10.12.7</checkstyle.version>
-        <spotbugs.version>4.8.3</spotbugs.version>
+        <spotbugs.version>4.9.6.0</spotbugs.version>
         <dependency-check.version>9.0.9</dependency-check.version>
 
         <!-- Maven Plugins -->
