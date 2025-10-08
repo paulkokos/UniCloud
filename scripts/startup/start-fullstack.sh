@@ -6,6 +6,11 @@
 echo "Starting UniCloud Full Stack (Backend + Desktop)..."
 echo ""
 
+# Get project root directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
 # Check if Docker PostgreSQL is running
 if ! docker ps | grep -q unicloud-postgres; then
     echo "Starting Docker PostgreSQL..."

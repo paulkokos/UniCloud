@@ -34,7 +34,9 @@ echo "Close the window to stop the application"
 echo ""
 
 # Start JavaFX Desktop Application
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
 mvn javafx:run -pl unicloud-desktop
 
 # Cleanup

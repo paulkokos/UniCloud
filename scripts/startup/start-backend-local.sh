@@ -83,5 +83,7 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 # Start Spring Boot backend with local profile
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
 mvn spring-boot:run -pl unicloud-backend -Dspring-boot.run.arguments="--spring.config.additional-location=file:/tmp/application-local.properties"
