@@ -1,11 +1,30 @@
+# Build stage
+FROM maven:3.9-eclipse-temurin-17 AS build
+
+WORKDIR /app
+
+# Copy Maven files
+COPY pom.xml .
+COPY unicloud-common/pom.xml unicloud-common/
+COPY unicloud-backend/pom.xml unicloud-backend/
+COPY unicloud-desktop/pom.xml unicloud-desktop/
+
+# Copy source code
+COPY unicloud-common/src unicloud-common/src
+COPY unicloud-backend/src unicloud-backend/src
+
+# Build the application
+RUN mvn clean package -DskipTests -pl unicloud-backend -am
+
+# Runtime stage
 FROM eclipse-temurin:17-jre
 
 WORKDIR /app
-COPY unicloud-backend/target/*.jar app.jar
+COPY --from=build /app/unicloud-backend/target/*.jar app.jar
 RUN mkdir -p /app/logs
 
 EXPOSE 8080 5005
 
 ENV JAVA_OPTS="-Xms256m -Xmx512m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dspring.profiles.active=development"
 
-CMD ["java", "-Dspring.main.class=com.unicloud.UniCloudBackendApplication", "-jar", "app.jar"]
+CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
