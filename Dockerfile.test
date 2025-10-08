@@ -1,5 +1,5 @@
 # Testing Dockerfile with test utilities
-FROM maven:3.9-openjdk-17-slim AS test
+FROM maven:3-openjdk-18-slim AS test
 
 # Install testing tools
 RUN apt-get update && \
