@@ -2,13 +2,20 @@
 
 <div align="center">
 
-**A unified multi-cloud file management application**
+**Enterprise-grade multi-cloud file management system**
 
+[![CI](https://github.com/paulkokos/UniCloud/workflows/UniCloud%20CI%20Pipeline/badge.svg)](https://github.com/paulkokos/UniCloud/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-0.1.0--SNAPSHOT-blue.svg)](https://semver.org/)
 [![Java](https://img.shields.io/badge/Java-17+-orange.svg)](https://openjdk.java.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-316192.svg)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D.svg)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg)](https://www.docker.com/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/paulkokos/UniCloud/pulls)
+
+**[Documentation](https://github.com/paulkokos/UniCloud/wiki)** | **[Issues](https://github.com/paulkokos/UniCloud/issues)** | **[Project Board](https://github.com/users/paulkokos/projects/13)**
 
 </div>
 
