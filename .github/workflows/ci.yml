@@ -211,7 +211,7 @@ jobs:
         fail_ci_if_error: false
 
     - name: Comment Coverage on PR
-      uses: madrapps/jacoco-report@v1.6.1
+      uses: madrapps/jacoco-report@v1.7.2
       if: github.event_name == 'pull_request'
       with:
         paths: |
