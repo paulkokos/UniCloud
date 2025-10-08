@@ -5,6 +5,7 @@
 **Enterprise-grade multi-cloud file management system**
 
 [![CI](https://github.com/paulkokos/UniCloud/workflows/UniCloud%20CI%20Pipeline/badge.svg)](https://github.com/paulkokos/UniCloud/actions)
+[![Release](https://img.shields.io/github/v/release/paulkokos/UniCloud)](https://github.com/paulkokos/UniCloud/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-0.1.0--SNAPSHOT-blue.svg)](https://semver.org/)
 [![Java](https://img.shields.io/badge/Java-17+-orange.svg)](https://openjdk.java.net/)
