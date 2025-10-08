@@ -34,7 +34,7 @@
         <!-- Code Quality -->
         <checkstyle.version>10.12.7</checkstyle.version>
         <spotbugs.version>4.8.3</spotbugs.version>
-        <dependency-check.version>9.0.9</dependency-check.version>
+        <dependency-check.version>12.1.6</dependency-check.version>
 
         <!-- Maven Plugins -->
         <maven-surefire.version>3.2.5</maven-surefire.version>
