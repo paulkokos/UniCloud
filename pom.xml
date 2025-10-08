@@ -37,7 +37,7 @@
         <dependency-check.version>9.0.9</dependency-check.version>
 
         <!-- Maven Plugins -->
-        <maven-surefire.version>3.2.5</maven-surefire.version>
+        <maven-surefire.version>3.5.4</maven-surefire.version>
         <maven-failsafe.version>3.2.5</maven-failsafe.version>
     </properties>
 
