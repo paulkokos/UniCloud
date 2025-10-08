@@ -9,6 +9,11 @@ COPY unicloud-common/pom.xml unicloud-common/
 COPY unicloud-backend/pom.xml unicloud-backend/
 COPY unicloud-desktop/pom.xml unicloud-desktop/
 
+# Copy checkstyle configuration
+COPY checkstyle.xml .
+COPY suppressions.xml .
+COPY owasp-suppressions.xml .
+
 # Copy source code
 COPY unicloud-common/src unicloud-common/src
 COPY unicloud-backend/src unicloud-backend/src
