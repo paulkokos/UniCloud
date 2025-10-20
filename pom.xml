@@ -32,7 +32,7 @@
         <jacoco.version>0.8.11</jacoco.version>
 
         <!-- Code Quality -->
-        <checkstyle.version>10.12.7</checkstyle.version>
+        <checkstyle.version>12.1.0</checkstyle.version>
         <spotbugs.version>4.8.3</spotbugs.version>
         <dependency-check.version>9.0.9</dependency-check.version>
 
