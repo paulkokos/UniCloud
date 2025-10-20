@@ -29,7 +29,7 @@
 
         <!-- Testing -->
         <testcontainers.version>1.19.3</testcontainers.version>
-        <jacoco.version>0.8.11</jacoco.version>
+        <jacoco.version>0.8.14</jacoco.version>
 
         <!-- Code Quality -->
         <checkstyle.version>10.12.7</checkstyle.version>
