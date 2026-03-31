@@ -1,5 +1,5 @@
 # Multi-stage build for UniCloud Spring Boot Backend
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3-eclipse-temurin-25 AS build
 
 # Set working directory
 WORKDIR /app
